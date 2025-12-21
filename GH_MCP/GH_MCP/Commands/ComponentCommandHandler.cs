@@ -11,6 +11,7 @@ using System.Linq;
 using Grasshopper.Kernel.Components;
 using System.Threading;
 using GH_MCP.Utils;
+using GH_MCP.Commands.Components;
 
 namespace GrasshopperMCP.Commands
 {
@@ -21,31 +22,42 @@ namespace GrasshopperMCP.Commands
     {
         /// <summary>
         /// 添加組件
+        /// 
+        /// 重要：只接受 GUID 參數，不進行任何名稱匹配。
+        /// 直接通過 GUID 創建組件，不需要輸入組件名稱或文字。
+        /// 使用 'get_component_candidates' 命令來查詢組件的 GUID。
         /// </summary>
-        /// <param name="command">包含組件類型和位置的命令</param>
+        /// <param name="command">包含 GUID 和位置的命令</param>
         /// <returns>添加的組件信息</returns>
+        /// <remarks>
+        /// 使用步驟：
+        /// 1. 首先使用 'get_component_candidates' 查詢組件候選並獲取 GUID
+        /// 2. 然後使用獲得的 GUID 來添加組件
+        /// 
+        /// 如果未提供 GUID 或 GUID 無效，系統將返回錯誤。
+        /// </remarks>
         public static object AddComponent(Command command)
         {
-            string type = command.GetParameter<string>("type");
             double x = command.GetParameter<double>("x");
             double y = command.GetParameter<double>("y");
-            
-            // 可選參數：用於區分同名組件
-            string category = command.GetParameter<string>("category");
             string guid = command.GetParameter<string>("guid");
-            string library = command.GetParameter<string>("library");
+            string type = command.GetParameter<string>("type"); // 接受 type 參數（可選，用於向後兼容）
             
-
-            if (string.IsNullOrEmpty(type))
+            // GUID 是唯一必需的參數，不進行任何名稱匹配
+            if (string.IsNullOrEmpty(guid))
             {
-                throw new ArgumentException("Component type is required");
+                throw new ArgumentException("GUID is required. Use 'get_component_candidates' to find the component GUID.");
             }
             
-            // 使用模糊匹配獲取標準化的元件名稱
-            string normalizedType = FuzzyMatcher.GetClosestComponentName(type);
-            
             // 記錄請求信息
-            RhinoApp.WriteLine($"AddComponent request: type={type}, normalized={normalizedType}, x={x}, y={y}, category={category}, guid={guid}, library={library}");
+            if (!string.IsNullOrEmpty(type))
+            {
+                RhinoApp.WriteLine($"AddComponent request: guid={guid}, type={type}, x={x}, y={y}");
+            }
+            else
+            {
+                RhinoApp.WriteLine($"AddComponent request: guid={guid}, x={x}, y={y}");
+            }
             
             object result = null;
             Exception exception = null;
@@ -65,504 +77,61 @@ namespace GrasshopperMCP.Commands
                     // 創建組件
                     IGH_DocumentObject component = null;
                     
-                    // 記錄可用的組件類型（僅在第一次調用時記錄）
-                    bool loggedComponentTypes = false;
-                    if (!loggedComponentTypes)
+                    // 如果提供了 type 參數，優先使用組件名稱來查找
+                    if (!string.IsNullOrEmpty(type))
                     {
-                        var availableTypes = Grasshopper.Instances.ComponentServer.ObjectProxies
-                            .Select(p => p.Desc.Name)
-                            .OrderBy(n => n)
-                            .ToList();
+                        // 使用組件名稱查找並創建組件
+                        var proxy = Grasshopper.Instances.ComponentServer.ObjectProxies
+                            .FirstOrDefault(p => p.Desc.Name.Equals(type, StringComparison.OrdinalIgnoreCase));
                         
-                        RhinoApp.WriteLine($"Available component types: {string.Join(", ", availableTypes.Take(50))}...");
-                        loggedComponentTypes = true;
+                        if (proxy != null)
+                        {
+                            component = proxy.CreateInstance();
+                            RhinoApp.WriteLine($"Created component by name: {type} (Type GUID: {proxy.Desc.InstanceGuid})");
+                        }
+                        else
+                        {
+                            throw new ArgumentException($"Component with name '{type}' not found.");
+                        }
                     }
-                    
-                    // 根據類型創建不同的組件
-                    switch (normalizedType.ToLowerInvariant())
+                    else
                     {
-                        // 平面元件
-                        case "xy plane":
-                            component = CreateComponentByName("XY Plane");
-                            break;
-                        case "xz plane":
-                            component = CreateComponentByName("XZ Plane");
-                            break;
-                        case "yz plane":
-                            component = CreateComponentByName("YZ Plane");
-                            break;
-                        case "plane 3pt":
-                            component = CreateComponentByName("Plane 3Pt");
-                            break;
-                            
-                        // 基本幾何元件
-                        case "box":
-                            component = CreateComponentByName("Box");
-                            break;
-                        case "sphere":
-                            component = CreateComponentByName("Sphere");
-                            break;
-                        case "cylinder":
-                            component = CreateComponentByName("Cylinder");
-                            break;
-                        case "cone":
-                            component = CreateComponentByName("Cone");
-                            break;
-                        case "circle":
-                            component = CreateComponentByName("Circle");
-                            break;
-                        case "rectangle":
-                            component = CreateComponentByName("Rectangle");
-                            break;
-                        case "line":
-                            component = CreateComponentByName("Line");
-                            break;
-                            
-                        // 參數元件
-                        case "point":
-                        case "pt":
-                        case "pointparam":
-                        case "param_point":
-                            component = new Param_Point();
-                            break;
-                        case "curve":
-                        case "crv":
-                        case "curveparam":
-                        case "param_curve":
-                            component = new Param_Curve();
-                            break;
-                        case "circleparam":
-                        case "param_circle":
-                            component = new Param_Circle();
-                            break;
-                        case "lineparam":
-                        case "param_line":
-                            component = new Param_Line();
-                            break;
-                        case "panel":
-                        case "gh_panel":
-                            component = new GH_Panel();
-                            break;
-                        case "slider":
-                        case "numberslider":
-                        case "gh_numberslider":
-                            var slider = new GH_NumberSlider();
-                            slider.SetInitCode("0.0 < 0.5 < 1.0");
-                            component = slider;
-                            break;
-                        case "number":
-                        case "num":
-                        case "integer":
-                        case "int":
-                        case "param_number":
-                        case "param_integer":
-                            component = new Param_Number();
-                            break;
-                        case "construct point":
-                        case "constructpoint":
-                        case "pt xyz":
-                        case "xyz":
-                            // 嘗試查找構造點組件
-                            var pointProxy = Grasshopper.Instances.ComponentServer.ObjectProxies
-                                .FirstOrDefault(p => p.Desc.Name.Equals("Construct Point", StringComparison.OrdinalIgnoreCase));
-                            if (pointProxy != null)
-                            {
-                                component = pointProxy.CreateInstance();
-                            }
-                            else
-                            {
-                                throw new ArgumentException("Construct Point component not found");
-                            }
-                            break;
-                        default:
-                            // 嘗試通過 Guid 查找組件
-                            Guid componentGuid;
-                            if (Guid.TryParse(type, out componentGuid))
-                            {
-                                component = Grasshopper.Instances.ComponentServer.EmitObject(componentGuid);
-                                RhinoApp.WriteLine($"Attempting to create component by GUID: {componentGuid}");
-                            }
+                        // 使用 GUID 創建組件（需要類型 GUID，不是實例 GUID）
+                        Guid componentGuid;
+                        if (!Guid.TryParse(guid, out componentGuid))
+                        {
+                            throw new ArgumentException($"Invalid GUID format: '{guid}'. Please provide a valid GUID.\n\n" +
+                                                      $"To find the appropriate GUID, use 'get_component_candidates' command:\n" +
+                                                      $"  Command: get_component_candidates\n" +
+                                                      $"  Parameters: {{ \"name\": \"<component_name>\" }}");
+                        }
+                        
+                        // 首先嘗試通過 ObjectProxies 查找（使用類型 GUID）
+                        var proxy = Grasshopper.Instances.ComponentServer.ObjectProxies
+                            .FirstOrDefault(p => p.Desc.InstanceGuid == componentGuid);
+                        
+                        if (proxy != null)
+                        {
+                            // 使用 ObjectProxy 創建組件（這是最可靠的方式）
+                            component = proxy.CreateInstance();
+                            RhinoApp.WriteLine($"Created component by type GUID via proxy: {component.GetType().Name} (Type GUID: {componentGuid})");
+                        }
+                        else
+                        {
+                            // 如果找不到 proxy，嘗試直接使用 EmitObject（需要類型 GUID）
+                            component = Grasshopper.Instances.ComponentServer.EmitObject(componentGuid);
                             
                             if (component == null)
                             {
-                                // 嘗試通過名稱查找組件（不區分大小寫）
-                                RhinoApp.WriteLine($"Attempting to find component by name: {type}");
-                                
-                                // 獲取所有匹配的組件
-                                var matchingProxies = Grasshopper.Instances.ComponentServer.ObjectProxies
-                                    .Where(p => p.Desc.Name.Equals(type, StringComparison.OrdinalIgnoreCase))
-                                    .ToList();
-                                
-                                if (matchingProxies.Count == 0)
-                                {
-                                    // 嘗試通過部分名稱匹配
-                                    RhinoApp.WriteLine($"Attempting to find component by partial name match: {type}");
-                                    matchingProxies = Grasshopper.Instances.ComponentServer.ObjectProxies
-                                        .Where(p => p.Desc.Name.IndexOf(type, StringComparison.OrdinalIgnoreCase) >= 0)
-                                        .ToList();
-                                }
-                                
-                                if (matchingProxies.Count == 0)
-                                {
-                                    // 沒有找到任何匹配
-                                    var possibleMatches = Grasshopper.Instances.ComponentServer.ObjectProxies
-                                        .Where(p => p.Desc.Name.IndexOf(type, StringComparison.OrdinalIgnoreCase) >= 0)
-                                        .Select(p => p.Desc.Name)
-                                        .Take(10)
-                                        .ToList();
-                                    
-                                    var errorMessage = $"Unknown component type: {type}";
-                                    if (possibleMatches.Any())
-                                    {
-                                        errorMessage += $". Possible matches: {string.Join(", ", possibleMatches)}";
-                                    }
-                                    
-                                    throw new ArgumentException(errorMessage);
-                                }
-                                else if (matchingProxies.Count == 1)
-                                {
-                                    // 只有一個匹配，直接使用
-                                    var obj = matchingProxies[0];
-                                    RhinoApp.WriteLine($"Found component: {obj.Desc.Name} (GUID: {obj.Desc.InstanceGuid})");
-                                    component = obj.CreateInstance();
-                                }
-                                else
-                                {
-                                    // 有多個同名組件，嘗試使用額外參數來區分
-                                    RhinoApp.WriteLine($"Found {matchingProxies.Count} components with name '{type}'. Attempting to filter by additional parameters...");
-                                    
-                                    var filteredProxies = matchingProxies;
-                                    
-                                    // 如果提供了 GUID，優先使用 GUID 匹配
-                                    if (!string.IsNullOrEmpty(guid))
-                                    {
-                                        Guid requestedGuid;
-                                        if (Guid.TryParse(guid, out requestedGuid))
-                                        {
-                                            filteredProxies = filteredProxies
-                                                .Where(p => p.Desc.InstanceGuid == requestedGuid)
-                                                .ToList();
-                                            
-                                            if (filteredProxies.Count > 0)
-                                            {
-                                                RhinoApp.WriteLine($"Filtered by GUID: {requestedGuid}");
-                                            }
-                                        }
-                                    }
-                                    
-                                    // 如果提供了 category，使用 category 過濾
-                                    if (filteredProxies.Count > 1 && !string.IsNullOrEmpty(category))
-                                    {
-                                        filteredProxies = filteredProxies
-                                            .Where(p => p.Desc.Category != null && 
-                                                       p.Desc.Category.Equals(category, StringComparison.OrdinalIgnoreCase))
-                                            .ToList();
-                                        
-                                        if (filteredProxies.Count > 0)
-                                        {
-                                            RhinoApp.WriteLine($"Filtered by category: {category}");
-                                        }
-                                    }
-                                    
-                                    // 如果提供了 library，使用 library 過濾
-                                    if (filteredProxies.Count > 1 && !string.IsNullOrEmpty(library))
-                                    {
-                                        filteredProxies = filteredProxies
-                                            .Where(p => 
-                                            {
-                                                try
-                                                {
-                                                    // 嘗試從組件實例獲取庫信息
-                                                    var tempComp = p.CreateInstance();
-                                                    if (tempComp != null)
-                                                    {
-                                                        var libName = tempComp.GetType().Assembly.GetName().Name;
-                                                        return libName != null && libName.IndexOf(library, StringComparison.OrdinalIgnoreCase) >= 0;
-                                                    }
-                                                }
-                                                catch { }
-                                                return false;
-                                            })
-                                            .ToList();
-                                        
-                                        if (filteredProxies.Count > 0)
-                                        {
-                                            RhinoApp.WriteLine($"Filtered by library: {library}");
-                                        }
-                                    }
-                                    
-                                    // 智能選擇：如果沒有明確指定，優先選擇未廢棄的原生內建組件
-                                    if (filteredProxies.Count > 1 && string.IsNullOrEmpty(guid))
-                                    {
-                                        // 首先排除廢棄的組件（通過檢查組件類型名稱或創建實例）
-                                        var nonObsolete = new List<Grasshopper.Kernel.IGH_ObjectProxy>();
-                                        foreach (var proxy in filteredProxies)
-                                        {
-                                            try
-                                            {
-                                                var tempComp = proxy.CreateInstance();
-                                                // 檢查組件類型名稱是否包含 "Obsolete" 或 "Deprecated"
-                                                var typeName = tempComp.GetType().Name;
-                                                if (typeName.IndexOf("Obsolete", StringComparison.OrdinalIgnoreCase) < 0 &&
-                                                    typeName.IndexOf("Deprecated", StringComparison.OrdinalIgnoreCase) < 0)
-                                                {
-                                                    nonObsolete.Add(proxy);
-                                                }
-                                            }
-                                            catch
-                                            {
-                                                // 如果無法創建，假設不是廢棄的
-                                                nonObsolete.Add(proxy);
-                                            }
-                                        }
-                                        
-                                        if (nonObsolete.Count > 0)
-                                        {
-                                            filteredProxies = nonObsolete;
-                                            RhinoApp.WriteLine($"Filtered out obsolete components. {filteredProxies.Count} non-obsolete components remaining.");
-                                        }
-                                        
-                                        // 如果仍然有多個，優先選擇原生內建組件（通過檢查 Assembly 名稱）
-                                        if (filteredProxies.Count > 1)
-                                        {
-                                            var builtIn = new List<Grasshopper.Kernel.IGH_ObjectProxy>();
-                                            foreach (var proxy in filteredProxies)
-                                            {
-                                                try
-                                                {
-                                                    var tempComp = proxy.CreateInstance();
-                                                    var assemblyName = tempComp.GetType().Assembly.GetName().Name;
-                                                    if (assemblyName != null && 
-                                                        (assemblyName.Equals("Grasshopper", StringComparison.OrdinalIgnoreCase) ||
-                                                         assemblyName.IndexOf("Grasshopper", StringComparison.OrdinalIgnoreCase) >= 0))
-                                                    {
-                                                        builtIn.Add(proxy);
-                                                    }
-                                                }
-                                                catch { }
-                                            }
-                                            
-                                            if (builtIn.Count > 0)
-                                            {
-                                                filteredProxies = builtIn;
-                                                RhinoApp.WriteLine($"Prioritized built-in Grasshopper components. {filteredProxies.Count} built-in components remaining.");
-                                            }
-                                        }
-                                        
-                                        // 如果仍然有多個，選擇第一個（通常是最常用的）
-                                        if (filteredProxies.Count > 1)
-                                        {
-                                            RhinoApp.WriteLine($"Multiple components still match. Using the first one: {filteredProxies[0].Desc.Name} (GUID: {filteredProxies[0].Desc.InstanceGuid})");
-                                            filteredProxies = filteredProxies.Take(1).ToList();
-                                        }
-                                    }
-                                    
-                                    if (filteredProxies.Count == 0)
-                                    {
-                                        // 過濾後沒有匹配，返回所有候選項的信息（包含詳細信息）
-                                        var candidates = matchingProxies.Select(p => 
-                                        {
-                                            // 嘗試創建臨時實例以獲取輸入輸出信息
-                                            IGH_DocumentObject tempComponent = null;
-                                            List<object> inputs = null;
-                                            List<object> outputs = null;
-                                            string libraryName = "Unknown";
-                                            bool isObsolete = false;
-                                            bool isBuiltIn = false;
-                                            string description = "No description available";
-                                            
-                                            try
-                                            {
-                                                tempComponent = p.CreateInstance();
-                                                
-                                                // 獲取庫名稱
-                                                try
-                                                {
-                                                    libraryName = tempComponent.GetType().Assembly.GetName().Name ?? "Unknown";
-                                                    isBuiltIn = libraryName.Equals("Grasshopper", StringComparison.OrdinalIgnoreCase) ||
-                                                               libraryName.IndexOf("Grasshopper", StringComparison.OrdinalIgnoreCase) >= 0;
-                                                }
-                                                catch { }
-                                                
-                                                // 檢查是否廢棄
-                                                try
-                                                {
-                                                    var typeName = tempComponent.GetType().Name;
-                                                    isObsolete = typeName.Contains("Obsolete", StringComparison.OrdinalIgnoreCase) ||
-                                                                typeName.Contains("Deprecated", StringComparison.OrdinalIgnoreCase);
-                                                }
-                                                catch { }
-                                                
-                                                // 獲取描述
-                                                try
-                                                {
-                                                    description = tempComponent.Description ?? "No description available";
-                                                }
-                                                catch { }
-                                                
-                                                if (tempComponent is IGH_Component comp)
-                                                {
-                                                    inputs = comp.Params.Input.Select(ip => new
-                                                    {
-                                                        name = ip.Name,
-                                                        nickname = ip.NickName,
-                                                        type = ip.TypeName,
-                                                        description = ip.Description
-                                                    }).Cast<object>().ToList();
-                                                    
-                                                    outputs = comp.Params.Output.Select(op => new
-                                                    {
-                                                        name = op.Name,
-                                                        nickname = op.NickName,
-                                                        type = op.TypeName,
-                                                        description = op.Description
-                                                    }).Cast<object>().ToList();
-                                                }
-                                            }
-                                            catch
-                                            {
-                                                // 如果無法創建實例，使用默認值
-                                            }
-                                            
-                                            return new
-                                            {
-                                                name = p.Desc.Name,
-                                                guid = p.Desc.InstanceGuid.ToString(),
-                                                category = p.Desc.Category?.ToString() ?? "Unknown",
-                                                subCategory = p.Desc.SubCategory?.ToString() ?? "Unknown",
-                                                library = libraryName,
-                                                description = description,
-                                                obsolete = isObsolete,
-                                                isBuiltIn = isBuiltIn,
-                                                inputs = inputs,
-                                                outputs = outputs
-                                            };
-                                        }).ToList();
-                                        
-                                        var errorMessage = $"Multiple components found with name '{type}' but none match the specified filters (category={category}, guid={guid}, library={library}). " +
-                                                          $"Available candidates:\n" +
-                                                          string.Join("\n", candidates.Select(c => 
-                                                              $"  - {c.name} (GUID: {c.guid})\n" +
-                                                              $"    Category: {c.category}, SubCategory: {c.subCategory}\n" +
-                                                              $"    Library: {c.library} {(c.isBuiltIn ? "(Built-in)" : "")}\n" +
-                                                              $"    Obsolete: {(c.obsolete ? "Yes" : "No")}\n" +
-                                                              $"    Description: {c.description}\n" +
-                                                              (c.inputs != null && c.inputs.Count > 0 ? 
-                                                                  $"    Inputs: {string.Join(", ", c.inputs.Cast<dynamic>().Select(i => $"{i.name} ({i.type})"))}\n" : "") +
-                                                              (c.outputs != null && c.outputs.Count > 0 ? 
-                                                                  $"    Outputs: {string.Join(", ", c.outputs.Cast<dynamic>().Select(o => $"{o.name} ({o.type})"))}\n" : "")));
-                                        
-                                        throw new ArgumentException(errorMessage);
-                                    }
-                                    else if (filteredProxies.Count == 1)
-                                    {
-                                        // 過濾後只有一個匹配
-                                        var obj = filteredProxies[0];
-                                        RhinoApp.WriteLine($"Found component after filtering: {obj.Desc.Name} (GUID: {obj.Desc.InstanceGuid})");
-                                        component = obj.CreateInstance();
-                                    }
-                                    else
-                                    {
-                                        // 過濾後仍然有多個匹配，返回候選項信息（包含詳細信息）
-                                        var candidates = filteredProxies.Select(p => 
-                                        {
-                                            // 嘗試創建臨時實例以獲取輸入輸出信息
-                                            IGH_DocumentObject tempComponent = null;
-                                            List<object> inputs = null;
-                                            List<object> outputs = null;
-                                            string libraryName = "Unknown";
-                                            bool isObsolete = false;
-                                            bool isBuiltIn = false;
-                                            string description = "No description available";
-                                            
-                                            try
-                                            {
-                                                tempComponent = p.CreateInstance();
-                                                
-                                                // 獲取庫名稱
-                                                try
-                                                {
-                                                    libraryName = tempComponent.GetType().Assembly.GetName().Name ?? "Unknown";
-                                                    isBuiltIn = libraryName.Equals("Grasshopper", StringComparison.OrdinalIgnoreCase) ||
-                                                               libraryName.IndexOf("Grasshopper", StringComparison.OrdinalIgnoreCase) >= 0;
-                                                }
-                                                catch { }
-                                                
-                                                // 檢查是否廢棄
-                                                try
-                                                {
-                                                    var typeName = tempComponent.GetType().Name;
-                                                    isObsolete = typeName.Contains("Obsolete", StringComparison.OrdinalIgnoreCase) ||
-                                                                typeName.Contains("Deprecated", StringComparison.OrdinalIgnoreCase);
-                                                }
-                                                catch { }
-                                                
-                                                // 獲取描述
-                                                try
-                                                {
-                                                    description = tempComponent.Description ?? "No description available";
-                                                }
-                                                catch { }
-                                                
-                                                if (tempComponent is IGH_Component comp)
-                                                {
-                                                    inputs = comp.Params.Input.Select(ip => new
-                                                    {
-                                                        name = ip.Name,
-                                                        nickname = ip.NickName,
-                                                        type = ip.TypeName,
-                                                        description = ip.Description
-                                                    }).Cast<object>().ToList();
-                                                    
-                                                    outputs = comp.Params.Output.Select(op => new
-                                                    {
-                                                        name = op.Name,
-                                                        nickname = op.NickName,
-                                                        type = op.TypeName,
-                                                        description = op.Description
-                                                    }).Cast<object>().ToList();
-                                                }
-                                            }
-                                            catch
-                                            {
-                                                // 如果無法創建實例，使用默認值
-                                            }
-                                            
-                                            return new
-                                            {
-                                                name = p.Desc.Name,
-                                                guid = p.Desc.InstanceGuid.ToString(),
-                                                category = p.Desc.Category?.ToString() ?? "Unknown",
-                                                subCategory = p.Desc.SubCategory?.ToString() ?? "Unknown",
-                                                library = libraryName,
-                                                description = description,
-                                                obsolete = isObsolete,
-                                                isBuiltIn = isBuiltIn,
-                                                inputs = inputs,
-                                                outputs = outputs
-                                            };
-                                        }).ToList();
-                                        
-                                        var errorMessage = $"Multiple components found with name '{type}' ({filteredProxies.Count} matches). " +
-                                                          $"Please specify additional parameters (guid, category, or library) to distinguish. " +
-                                                          $"Recommendation: Prefer non-obsolete, built-in components.\n" +
-                                                          $"Available candidates:\n" +
-                                                          string.Join("\n", candidates.Select(c => 
-                                                              $"  - {c.name} (GUID: {c.guid})\n" +
-                                                              $"    Category: {c.category}, SubCategory: {c.subCategory}\n" +
-                                                              $"    Library: {c.library} {(c.isBuiltIn ? "(Built-in - Recommended)" : "")}\n" +
-                                                              $"    Obsolete: {(c.obsolete ? "Yes (Not Recommended)" : "No (Recommended)")}\n" +
-                                                              $"    Description: {c.description}\n" +
-                                                              (c.inputs != null && c.inputs.Count > 0 ? 
-                                                                  $"    Inputs: {string.Join(", ", c.inputs.Cast<dynamic>().Select(i => $"{i.name} ({i.type})"))}\n" : "") +
-                                                              (c.outputs != null && c.outputs.Count > 0 ? 
-                                                                  $"    Outputs: {string.Join(", ", c.outputs.Cast<dynamic>().Select(o => $"{o.name} ({o.type})"))}\n" : "")));
-                                        
-                                        throw new ArgumentException(errorMessage);
-                                    }
-                                }
+                                throw new ArgumentException($"Component with type GUID '{guid}' not found. " +
+                                                          $"Please verify the GUID is correct using 'get_component_candidates' command. " +
+                                                          $"Note: You need the component TYPE GUID, not instance GUID.");
                             }
-                            break;
+                            else
+                            {
+                                RhinoApp.WriteLine($"Created component by type GUID: {component.GetType().Name} (Type GUID: {componentGuid})");
+                            }
+                        }
                     }
                     
                     // 設置組件位置
@@ -756,6 +325,9 @@ namespace GrasshopperMCP.Commands
         {
             string idStr = command.GetParameter<string>("id");
             string value = command.GetParameter<string>("value");
+            double? minValue = command.GetParameter<double?>("min");
+            double? maxValue = command.GetParameter<double?>("max");
+            double? rounding = command.GetParameter<double?>("rounding");
             
             if (string.IsNullOrEmpty(idStr))
             {
@@ -798,15 +370,68 @@ namespace GrasshopperMCP.Commands
                     }
                     else if (component is GH_NumberSlider slider)
                     {
-                        double doubleValue;
-                        if (double.TryParse(value, out doubleValue))
+                        // 設置最小值
+                        if (minValue.HasValue)
                         {
-                            slider.SetSliderValue((decimal)doubleValue);
+                            slider.Slider.Minimum = (decimal)minValue.Value;
+                            RhinoApp.WriteLine($"  Slider minimum set to: {minValue.Value}");
                         }
-                        else
+                        
+                        // 設置最大值
+                        if (maxValue.HasValue)
                         {
-                            throw new ArgumentException("Invalid slider value format");
+                            slider.Slider.Maximum = (decimal)maxValue.Value;
+                            RhinoApp.WriteLine($"  Slider maximum set to: {maxValue.Value}");
                         }
+                        
+                        // 設置精度
+                        if (rounding.HasValue)
+                        {
+                            int decimalPlaces = 0;
+                            if (rounding.Value > 0)
+                            {
+                                decimalPlaces = Math.Max(0, (int)Math.Abs(Math.Log10(rounding.Value)));
+                            }
+                            slider.Slider.DecimalPlaces = decimalPlaces;
+                            RhinoApp.WriteLine($"  Slider decimal places set to: {decimalPlaces} (rounding: {rounding.Value})");
+                        }
+                        
+                        // 設置值（必須在設置範圍之後）
+                        if (!string.IsNullOrEmpty(value))
+                        {
+                            double doubleValue;
+                            if (double.TryParse(value, out doubleValue))
+                            {
+                                decimal sliderValue = (decimal)doubleValue;
+                                // 確保值在範圍內
+                                if (sliderValue < slider.Slider.Minimum)
+                                    sliderValue = slider.Slider.Minimum;
+                                if (sliderValue > slider.Slider.Maximum)
+                                    sliderValue = slider.Slider.Maximum;
+                                
+                                slider.Slider.Value = sliderValue;
+                                RhinoApp.WriteLine($"  Slider value set to: {sliderValue}");
+                            }
+                            else
+                            {
+                                throw new ArgumentException("Invalid slider value format");
+                            }
+                        }
+                        
+                        // 強制更新
+                        try
+                        {
+                            var expireLayoutMethod = slider.GetType().GetMethod("ExpireLayout");
+                            if (expireLayoutMethod != null)
+                            {
+                                expireLayoutMethod.Invoke(slider, null);
+                            }
+                        }
+                        catch
+                        {
+                            // ExpireLayout may not exist in all versions
+                        }
+                        slider.ExpireSolution(true);
                     }
                     else if (component is IGH_Component ghComponent)
                     {
@@ -962,6 +587,35 @@ namespace GrasshopperMCP.Commands
                             });
                         }
                         componentInfo["outputs"] = outputs;
+                        
+                        // 收集運行時訊息（錯誤和警告）
+                        var runtimeMessages = new List<Dictionary<string, object>>();
+                        
+                        // 收集錯誤訊息
+                        var errorMessages = ghComponent.RuntimeMessages(GH_RuntimeMessageLevel.Error);
+                        foreach (var errorText in errorMessages)
+                        {
+                            runtimeMessages.Add(new Dictionary<string, object>
+                            {
+                                { "type", "Error" },
+                                { "text", errorText },
+                                { "description", errorText }
+                            });
+                        }
+                        
+                        // 收集警告訊息
+                        var warningMessages = ghComponent.RuntimeMessages(GH_RuntimeMessageLevel.Warning);
+                        foreach (var warningText in warningMessages)
+                        {
+                            runtimeMessages.Add(new Dictionary<string, object>
+                            {
+                                { "type", "Warning" },
+                                { "text", warningText },
+                                { "description", warningText }
+                            });
+                        }
+                        
+                        componentInfo["runtimeMessages"] = runtimeMessages;
                     }
                     
                     // 如果是 GH_Panel，獲取其文本值
@@ -1002,6 +656,249 @@ namespace GrasshopperMCP.Commands
             return result;
         }
         
+        /// <summary>
+        /// 查詢組件候選項
+        /// </summary>
+        /// <param name="command">包含組件名稱的命令</param>
+        /// <returns>所有匹配的組件候選項信息</returns>
+        public static object GetComponentCandidates(Command command)
+        {
+            string componentName = command.GetParameter<string>("name");
+            if (string.IsNullOrEmpty(componentName))
+            {
+                throw new ArgumentException("Component name is required");
+            }
+            
+            object result = null;
+            Exception exception = null;
+            
+            // 在 UI 線程上執行
+            RhinoApp.InvokeOnUiThread(new Action(() =>
+            {
+                try
+                {
+                    // 使用模糊匹配獲取標準化的元件名稱
+                    string normalizedType = FuzzyMatcher.GetClosestComponentName(componentName);
+                    
+                    // 獲取所有匹配的組件
+                    var matchingProxies = Grasshopper.Instances.ComponentServer.ObjectProxies
+                        .Where(p => p.Desc.Name.IndexOf(normalizedType, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                   p.Desc.Name.IndexOf(componentName, StringComparison.OrdinalIgnoreCase) >= 0)
+                        .ToList();
+                    
+                    if (matchingProxies.Count == 0)
+                    {
+                        result = new
+                        {
+                            query = componentName,
+                            normalizedQuery = normalizedType,
+                            count = 0,
+                            candidates = new List<object>()
+                        };
+                        return;
+                    }
+                    
+                    // 為每個候選項獲取詳細信息
+                    var candidates = matchingProxies.Select(p =>
+                    {
+                        IGH_DocumentObject tempComponent = null;
+                        List<object> inputs = null;
+                        List<object> outputs = null;
+                        string libraryName = "Unknown";
+                        bool isObsolete = false;
+                        bool isBuiltIn = false;
+                        string description = "No description available";
+                        string typeName = "Unknown";
+                        
+                        try
+                        {
+                            tempComponent = p.CreateInstance();
+                            typeName = tempComponent.GetType().Name;
+                            
+                            // 獲取庫名稱
+                            try
+                            {
+                                libraryName = tempComponent.GetType().Assembly.GetName().Name ?? "Unknown";
+                                isBuiltIn = libraryName.Equals("Grasshopper", StringComparison.OrdinalIgnoreCase) ||
+                                           libraryName.IndexOf("Grasshopper", StringComparison.OrdinalIgnoreCase) >= 0;
+                            }
+                            catch { }
+                            
+                            // 檢查是否廢棄
+                            try
+                            {
+                                isObsolete = typeName.IndexOf("Obsolete", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                            typeName.IndexOf("Deprecated", StringComparison.OrdinalIgnoreCase) >= 0;
+                            }
+                            catch { }
+                            
+                            // 獲取描述
+                            try
+                            {
+                                description = tempComponent.Description ?? "No description available";
+                            }
+                            catch { }
+                            
+                            // 獲取輸入輸出參數
+                            if (tempComponent is IGH_Component comp)
+                            {
+                                inputs = comp.Params.Input.Select(ip => new
+                                {
+                                    name = ip.Name,
+                                    nickname = ip.NickName,
+                                    type = ip.TypeName,
+                                    description = ip.Description ?? ""
+                                }).Cast<object>().ToList();
+                                
+                                outputs = comp.Params.Output.Select(op => new
+                                {
+                                    name = op.Name,
+                                    nickname = op.NickName,
+                                    type = op.TypeName,
+                                    description = op.Description ?? ""
+                                }).Cast<object>().ToList();
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            RhinoApp.WriteLine($"Error getting component info for {p.Desc.Name}: {ex.Message}");
+                        }
+                        
+                        return new
+                        {
+                            name = p.Desc.Name,
+                            fullName = p.Desc.Name,
+                            guid = p.Desc.InstanceGuid.ToString(),
+                            category = p.Desc.Category?.ToString() ?? "Unknown",
+                            subCategory = p.Desc.SubCategory?.ToString() ?? "Unknown",
+                            library = libraryName,
+                            typeName = typeName,
+                            description = description,
+                            obsolete = isObsolete,
+                            isBuiltIn = isBuiltIn,
+                            inputs = inputs ?? new List<object>(),
+                            outputs = outputs ?? new List<object>()
+                        };
+                    }).ToList();
+                    
+                    result = new
+                    {
+                        query = componentName,
+                        normalizedQuery = normalizedType,
+                        count = candidates.Count,
+                        candidates = candidates
+                    };
+                }
+                catch (Exception ex)
+                {
+                    exception = ex;
+                    RhinoApp.WriteLine($"Error in GetComponentCandidates: {ex.Message}");
+                }
+            }));
+            
+            // 等待 UI 線程操作完成
+            while (result == null && exception == null)
+            {
+                Thread.Sleep(10);
+            }
+            
+            if (exception != null)
+            {
+                throw exception;
+            }
+            
+            return result;
+        }
+        
+        /// <summary>
+        /// 獲取文檔中所有組件的錯誤訊息
+        /// </summary>
+        /// <param name="command">命令（此命令不需要參數）</param>
+        /// <returns>包含所有錯誤和警告的列表</returns>
+        public static object GetDocumentErrors(Command command)
+        {
+            object result = null;
+            Exception exception = null;
+            
+            // 在 UI 線程上執行
+            RhinoApp.InvokeOnUiThread(new Action(() =>
+            {
+                try
+                {
+                    // 獲取 Grasshopper 文檔
+                    var doc = Grasshopper.Instances.ActiveCanvas?.Document;
+                    if (doc == null)
+                    {
+                        throw new InvalidOperationException("No active Grasshopper document");
+                    }
+                    
+                    var allErrors = new List<Dictionary<string, object>>();
+                    
+                    // 遍歷文檔中所有組件
+                    foreach (var obj in doc.Objects)
+                    {
+                        if (obj is IGH_Component component)
+                        {
+                            // 收集該組件的錯誤訊息
+                            var errorMessages = component.RuntimeMessages(GH_RuntimeMessageLevel.Error);
+                            foreach (var errorText in errorMessages)
+                            {
+                                allErrors.Add(new Dictionary<string, object>
+                                {
+                                    { "componentId", component.InstanceGuid.ToString() },
+                                    { "componentName", component.NickName },
+                                    { "componentType", component.GetType().Name },
+                                    { "messageType", "Error" },
+                                    { "message", errorText },
+                                    { "description", errorText }
+                                });
+                            }
+                            
+                            // 收集該組件的警告訊息
+                            var warningMessages = component.RuntimeMessages(GH_RuntimeMessageLevel.Warning);
+                            foreach (var warningText in warningMessages)
+                            {
+                                allErrors.Add(new Dictionary<string, object>
+                                {
+                                    { "componentId", component.InstanceGuid.ToString() },
+                                    { "componentName", component.NickName },
+                                    { "componentType", component.GetType().Name },
+                                    { "messageType", "Warning" },
+                                    { "message", warningText },
+                                    { "description", warningText }
+                                });
+                            }
+                        }
+                    }
+                    
+                    result = new Dictionary<string, object>
+                    {
+                        { "errorCount", allErrors.Count },
+                        { "errors", allErrors }
+                    };
+                }
+                catch (Exception ex)
+                {
+                    exception = ex;
+                    RhinoApp.WriteLine($"Error in GetDocumentErrors: {ex.Message}");
+                }
+            }));
+            
+            // 等待 UI 線程操作完成
+            while (result == null && exception == null)
+            {
+                Thread.Sleep(10);
+            }
+            
+            // 如果有異常，拋出
+            if (exception != null)
+            {
+                throw exception;
+            }
+            
+            return result;
+        }
+        
         private static IGH_DocumentObject CreateComponentByName(string name)
         {
             var obj = Grasshopper.Instances.ComponentServer.ObjectProxies
@@ -1015,6 +912,427 @@ namespace GrasshopperMCP.Commands
             {
                 throw new ArgumentException($"Component with name {name} not found");
             }
+        }
+
+        /// <summary>
+        /// 將多個元件群組起來
+        /// </summary>
+        /// <param name="command">包含 componentIds 的命令</param>
+        /// <returns>群組資訊</returns>
+        public static object GroupComponents(Command command)
+        {
+            return ComponentOrganization.GroupComponents(command);
+        }
+
+        /// <summary>
+        /// 設置 Number Slider 的完整屬性
+        /// </summary>
+        /// <param name="command">包含組件 ID 和屬性的命令</param>
+        /// <returns>操作結果</returns>
+        public static object SetSliderProperties(Command command)
+        {
+            return ComponentProperties.SetSliderProperties(command);
+        }
+
+        /// <summary>
+        /// 刪除組件
+        /// </summary>
+        /// <param name="command">包含組件ID的命令</param>
+        /// <returns>刪除結果</returns>
+        public static object DeleteComponent(Command command)
+        {
+            string componentId = command.GetParameter<string>("componentId");
+            
+            if (string.IsNullOrEmpty(componentId))
+            {
+                throw new ArgumentException("Component ID is required");
+            }
+            
+            object result = null;
+            Exception exception = null;
+            
+            RhinoApp.InvokeOnUiThread(new Action(() =>
+            {
+                try
+                {
+                    var doc = Grasshopper.Instances.ActiveCanvas?.Document;
+                    if (doc == null)
+                    {
+                        throw new InvalidOperationException("No active Grasshopper document");
+                    }
+                    
+                    Guid guid;
+                    if (!Guid.TryParse(componentId, out guid))
+                    {
+                        throw new ArgumentException($"Invalid component ID: {componentId}");
+                    }
+                    
+                    var component = doc.FindObject(guid, true);
+                    if (component == null)
+                    {
+                        throw new ArgumentException($"Component not found: {componentId}");
+                    }
+                    
+                    doc.RemoveObject(component, true);
+                    doc.NewSolution(false);
+                    
+                    result = new
+                    {
+                        success = true,
+                        message = "Component deleted successfully",
+                        componentId = componentId
+                    };
+                }
+                catch (Exception ex)
+                {
+                    exception = ex;
+                    RhinoApp.WriteLine($"Error in DeleteComponent: {ex.Message}");
+                }
+            }));
+            
+            while (result == null && exception == null)
+            {
+                Thread.Sleep(10);
+            }
+            
+            if (exception != null)
+            {
+                throw exception;
+            }
+            
+            return result;
+        }
+
+        /// <summary>
+        /// 移動組件到指定位置
+        /// </summary>
+        /// <param name="command">包含組件ID和新位置的命令</param>
+        /// <returns>移動結果</returns>
+        public static object MoveComponent(Command command)
+        {
+            string componentId = command.GetParameter<string>("componentId");
+            double x = command.GetParameter<double>("x");
+            double y = command.GetParameter<double>("y");
+            
+            if (string.IsNullOrEmpty(componentId))
+            {
+                throw new ArgumentException("Component ID is required");
+            }
+            
+            object result = null;
+            Exception exception = null;
+            
+            RhinoApp.InvokeOnUiThread(new Action(() =>
+            {
+                try
+                {
+                    var doc = Grasshopper.Instances.ActiveCanvas?.Document;
+                    if (doc == null)
+                    {
+                        throw new InvalidOperationException("No active Grasshopper document");
+                    }
+                    
+                    Guid guid;
+                    if (!Guid.TryParse(componentId, out guid))
+                    {
+                        throw new ArgumentException($"Invalid component ID: {componentId}");
+                    }
+                    
+                    var component = doc.FindObject(guid, true);
+                    if (component == null)
+                    {
+                        throw new ArgumentException($"Component not found: {componentId}");
+                    }
+                    
+                    if (component.Attributes == null)
+                    {
+                        component.CreateAttributes();
+                    }
+                    
+                    component.Attributes.Pivot = new System.Drawing.PointF((float)x, (float)y);
+                    doc.NewSolution(false);
+                    
+                    result = new
+                    {
+                        success = true,
+                        message = "Component moved successfully",
+                        componentId = componentId,
+                        x = x,
+                        y = y
+                    };
+                }
+                catch (Exception ex)
+                {
+                    exception = ex;
+                    RhinoApp.WriteLine($"Error in MoveComponent: {ex.Message}");
+                }
+            }));
+            
+            while (result == null && exception == null)
+            {
+                Thread.Sleep(10);
+            }
+            
+            if (exception != null)
+            {
+                throw exception;
+            }
+            
+            return result;
+        }
+
+        /// <summary>
+        /// 設置組件可見性
+        /// </summary>
+        /// <param name="command">包含組件ID和可見性狀態的命令</param>
+        /// <returns>操作結果</returns>
+        public static object SetComponentVisibility(Command command)
+        {
+            string componentId = command.GetParameter<string>("componentId");
+            bool? hidden = command.GetParameter<bool?>("hidden");
+            
+            if (string.IsNullOrEmpty(componentId))
+            {
+                throw new ArgumentException("Component ID is required");
+            }
+            
+            if (!hidden.HasValue)
+            {
+                throw new ArgumentException("Hidden parameter is required");
+            }
+            
+            object result = null;
+            Exception exception = null;
+            
+            RhinoApp.InvokeOnUiThread(new Action(() =>
+            {
+                try
+                {
+                    var doc = Grasshopper.Instances.ActiveCanvas?.Document;
+                    if (doc == null)
+                    {
+                        throw new InvalidOperationException("No active Grasshopper document");
+                    }
+                    
+                    Guid guid;
+                    if (!Guid.TryParse(componentId, out guid))
+                    {
+                        throw new ArgumentException($"Invalid component ID: {componentId}");
+                    }
+                    
+                    var component = doc.FindObject(guid, true);
+                    if (component == null)
+                    {
+                        throw new ArgumentException($"Component not found: {componentId}");
+                    }
+                    
+                    if (component.Attributes == null)
+                    {
+                        component.CreateAttributes();
+                    }
+                    
+                    // 設置可見性
+                    component.Attributes.Hidden = hidden.Value;
+                    
+                    // 刷新畫布
+                    doc.NewSolution(false);
+                    
+                    result = new
+                    {
+                        success = true,
+                        message = $"Component visibility set to {(hidden.Value ? "hidden" : "visible")}",
+                        componentId = componentId,
+                        hidden = hidden.Value
+                    };
+                }
+                catch (Exception ex)
+                {
+                    exception = ex;
+                    RhinoApp.WriteLine($"Error in SetComponentVisibility: {ex.Message}");
+                }
+            }));
+            
+            while (result == null && exception == null)
+            {
+                Thread.Sleep(10);
+            }
+            
+            if (exception != null)
+            {
+                throw exception;
+            }
+            
+            return result;
+        }
+
+        /// <summary>
+        /// 縮放到指定組件
+        /// </summary>
+        /// <param name="command">包含組件ID列表的命令</param>
+        /// <returns>操作結果</returns>
+        public static object ZoomToComponents(Command command)
+        {
+            var componentIds = command.GetParameter<List<string>>("componentIds");
+            
+            if (componentIds == null || componentIds.Count == 0)
+            {
+                throw new ArgumentException("At least one component ID is required");
+            }
+            
+            object result = null;
+            Exception exception = null;
+            
+            // 在 UI 線程上執行
+            RhinoApp.InvokeOnUiThread(new Action(() =>
+            {
+                try
+                {
+                    // 獲取 Grasshopper 文檔和畫布
+                    var doc = Grasshopper.Instances.ActiveCanvas?.Document;
+                    var canvas = Grasshopper.Instances.ActiveCanvas;
+                    
+                    if (doc == null)
+                    {
+                        throw new InvalidOperationException("No active Grasshopper document");
+                    }
+                    
+                    if (canvas == null)
+                    {
+                        throw new InvalidOperationException("No active Grasshopper canvas");
+                    }
+                    
+                    // 查找所有指定的組件
+                    var components = new List<IGH_DocumentObject>();
+                    var notFoundIds = new List<string>();
+                    
+                    foreach (var idStr in componentIds)
+                    {
+                        Guid guid;
+                        if (!Guid.TryParse(idStr, out guid))
+                        {
+                            notFoundIds.Add(idStr);
+                            continue;
+                        }
+                        
+                        var component = doc.FindObject(guid, true);
+                        if (component != null)
+                        {
+                            components.Add(component);
+                        }
+                        else
+                        {
+                            notFoundIds.Add(idStr);
+                        }
+                    }
+                    
+                    if (components.Count == 0)
+                    {
+                        throw new ArgumentException("No valid components found");
+                    }
+                    
+                    // 計算所有組件的邊界框
+                    System.Drawing.RectangleF? combinedBounds = null;
+                    
+                    foreach (var component in components)
+                    {
+                        if (component.Attributes != null)
+                        {
+                            var bounds = component.Attributes.Bounds;
+                            if (combinedBounds.HasValue)
+                            {
+                                combinedBounds = System.Drawing.RectangleF.Union(combinedBounds.Value, bounds);
+                            }
+                            else
+                            {
+                                combinedBounds = bounds;
+                            }
+                        }
+                    }
+                    
+                    if (combinedBounds.HasValue)
+                    {
+                        // 計算中心點和適當的縮放級別
+                        var centerX = combinedBounds.Value.X + combinedBounds.Value.Width / 2;
+                        var centerY = combinedBounds.Value.Y + combinedBounds.Value.Height / 2;
+                        
+                        // 添加一些邊距
+                        var margin = 100f;
+                        var width = combinedBounds.Value.Width + margin * 2;
+                        var height = combinedBounds.Value.Height + margin * 2;
+                        
+                        // 使用 Canvas 的視圖功能
+                        try
+                        {
+                            // 先選中組件
+                            doc.SelectObjects(components, true);
+                            
+                            // 嘗試使用 ZoomExtents 方法
+                            var zoomMethod = canvas.GetType().GetMethod("ZoomExtents", 
+                                System.Reflection.BindingFlags.Public | 
+                                System.Reflection.BindingFlags.Instance);
+                            
+                            if (zoomMethod != null)
+                            {
+                                zoomMethod.Invoke(canvas, null);
+                            }
+                            else
+                            {
+                                // 方法2: 手動設置視圖
+                                var viewport = canvas.Viewport;
+                                if (viewport != null)
+                                {
+                                    var viewportSize = viewport.Size;
+                                    var scaleX = viewportSize.Width / width;
+                                    var scaleY = viewportSize.Height / height;
+                                    var scale = Math.Min(scaleX, scaleY) * 0.9f; // 90% 以留邊距
+                                    
+                                    // 設置視圖中心
+                                    viewport.Pan = new System.Drawing.PointF(
+                                        -centerX + viewportSize.Width / 2 / scale,
+                                        -centerY + viewportSize.Height / 2 / scale
+                                    );
+                                    viewport.Zoom = scale;
+                                    canvas.Refresh();
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            RhinoApp.WriteLine($"Warning: Could not zoom using standard method: {ex.Message}");
+                            // 嘗試替代方法：至少選中組件
+                            doc.SelectObjects(components, true);
+                            canvas.Refresh();
+                        }
+                    }
+                    
+                    result = new
+                    {
+                        success = true,
+                        message = $"Zoomed to {components.Count} component(s)",
+                        componentCount = components.Count,
+                        componentIds = components.Select(c => c.InstanceGuid.ToString()).ToList(),
+                        notFoundIds = notFoundIds
+                    };
+                }
+                catch (Exception ex)
+                {
+                    exception = ex;
+                    RhinoApp.WriteLine($"Error in ZoomToComponents: {ex.Message}");
+                }
+            }));
+            
+            // 等待 UI 線程操作完成
+            while (result == null && exception == null)
+            {
+                Thread.Sleep(10);
+            }
+            
+            if (exception != null)
+            {
+                throw exception;
+            }
+            
+            return result;
         }
     }
 }

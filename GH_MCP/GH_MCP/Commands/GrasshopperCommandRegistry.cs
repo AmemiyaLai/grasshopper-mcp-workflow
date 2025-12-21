@@ -68,6 +68,30 @@ namespace GH_MCP.Commands
             
             // 獲取組件信息
             RegisterCommand("get_component_info", ComponentCommandHandler.GetComponentInfo);
+            
+            // 查詢組件候選項
+            RegisterCommand("get_component_candidates", ComponentCommandHandler.GetComponentCandidates);
+            
+            // 獲取文檔錯誤訊息
+            RegisterCommand("get_document_errors", ComponentCommandHandler.GetDocumentErrors);
+            
+            // 群組組件
+            RegisterCommand("group_components", ComponentCommandHandler.GroupComponents);
+            
+            // 設置 Slider 屬性
+            RegisterCommand("set_slider_properties", ComponentCommandHandler.SetSliderProperties);
+            
+            // 刪除組件
+            RegisterCommand("delete_component", ComponentCommandHandler.DeleteComponent);
+            
+            // 移動組件
+            RegisterCommand("move_component", ComponentCommandHandler.MoveComponent);
+            
+            // 設置組件可見性
+            RegisterCommand("set_component_visibility", ComponentCommandHandler.SetComponentVisibility);
+            
+            // 縮放到組件
+            RegisterCommand("zoom_to_components", ComponentCommandHandler.ZoomToComponents);
         }
 
         /// <summary>

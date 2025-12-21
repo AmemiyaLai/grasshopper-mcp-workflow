@@ -1,9 +1,8 @@
 import socket
 import json
-import os
 import sys
 import traceback
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 
 # 使用 MCP 服務器
 from mcp.server.fastmcp import FastMCP
@@ -66,108 +65,45 @@ def send_to_grasshopper(command_type: str, params: Optional[Dict[str, Any]] = No
 
 # 註冊 MCP 工具
 @server.tool("add_component")
-def add_component(component_type: str, x: float, y: float, category: Optional[str] = None, guid: Optional[str] = None, library: Optional[str] = None):
+def add_component(guid: str, x: float, y: float):
     """
-    Add a component to the Grasshopper canvas
+    Add a component to the Grasshopper canvas using GUID only.
+    
+    IMPORTANT: This function ONLY accepts GUID. No component name matching is performed.
+    To find the GUID for a component, use the 'get_component_candidates' command first.
     
     Args:
-        component_type: Component type (point, curve, circle, line, panel, slider, etc.)
+        guid: REQUIRED - GUID to uniquely identify the component. Use 'get_component_candidates' to find the correct GUID.
         x: X coordinate on the canvas
         y: Y coordinate on the canvas
-        category: Optional category name to distinguish between multiple components with the same name
-        guid: Optional GUID to uniquely identify a specific component (most reliable way to distinguish duplicates)
-        library: Optional library name to distinguish between components from different libraries
     
     Returns:
         Result of adding the component
     
+    Usage:
+        1. First, query component candidates to get the GUID:
+           get_component_candidates(name="Rectangle")
+        
+        2. Then, use the GUID to add the component:
+           add_component(
+               guid="86a2e2dd-a3d8-4f24-9421-09ca3abe3a12",
+               x=100.0,
+               y=100.0
+           )
+    
     Note:
-        If multiple components have the same name, the system will automatically:
-        1. Prefer non-obsolete components (exclude deprecated/obsolete components)
-        2. Prefer built-in Grasshopper components over third-party plugins
-        3. Select the first match if multiple candidates remain
-        
-        You can also explicitly specify:
-        - guid: Most reliable, use the component's GUID
-        - category: Filter by component category (e.g., "Params", "Maths", "Vector", "Surface")
-        - library: Filter by the library/plugin name that provides the component
-        
-        The system will provide detailed information about all candidates if automatic selection fails,
-        including: description, obsolete status, built-in status, inputs, and outputs.
-    
-    Important Workflow Notes:
-        When creating 3D solids from 2D curves using Extrude:
-        1. Create 2D closed curves (Rectangle, Circle, Polygon) on a plane
-        2. CRITICAL: Use Boundary Surfaces component to convert closed curves to surfaces first
-        3. Connect Boundary Surfaces output to Extrude.Base input
-        4. Create extrusion direction: Unit Z → Amplitude (with Number Slider) → Extrude.Direction
-        5. The Extrude component will create a 3D solid from the surface
-        
-        Standard workflow: Closed 2D Curve → Boundary Surfaces → Surface → Extrude.Base + Extrude.Direction → 3D Solid
-        
-        Do NOT try to extrude closed curves directly - you must use Boundary Surfaces first!
+        - Only GUID is accepted. No component name or text input is required.
+        - No matching or searching is performed - the component is created directly from the GUID.
+        - Use 'get_component_candidates' command to search for components and obtain their GUIDs.
     """
-    # 處理常見的組件名稱混淆問題
-    component_mapping = {
-        # Number Slider 的各種可能輸入方式
-        "number slider": "Number Slider",
-        "numeric slider": "Number Slider",
-        "num slider": "Number Slider",
-        "slider": "Number Slider",  # 當只提到 slider 且上下文是數值時，預設為 Number Slider
-        
-        # 其他組件的標準化名稱
-        "md slider": "MD Slider",
-        "multidimensional slider": "MD Slider",
-        "multi-dimensional slider": "MD Slider",
-        "graph mapper": "Graph Mapper",
-        
-        # 數學運算組件
-        "add": "Addition",
-        "addition": "Addition",
-        "plus": "Addition",
-        "sum": "Addition",
-        "subtract": "Subtraction",
-        "subtraction": "Subtraction",
-        "minus": "Subtraction",
-        "difference": "Subtraction",
-        "multiply": "Multiplication",
-        "multiplication": "Multiplication",
-        "times": "Multiplication",
-        "product": "Multiplication",
-        "divide": "Division",
-        "division": "Division",
-        
-        # 向量運算組件
-        "amplitude": "Amplitude",
-        "vector scale": "Amplitude",
-        "scale vector": "Amplitude",
-        
-        # 輸出組件
-        "panel": "Panel",
-        "text panel": "Panel",
-        "output panel": "Panel",
-        "display": "Panel"
-    }
-    
-    # 檢查並修正組件類型
-    normalized_type = component_type.lower()
-    if normalized_type in component_mapping:
-        component_type = component_mapping[normalized_type]
-        print(f"Component type normalized from '{normalized_type}' to '{component_mapping[normalized_type]}'", file=sys.stderr)
+    if not guid:
+        raise ValueError("GUID is required. Use 'get_component_candidates' to find the component GUID.")
     
     params = {
-        "type": component_type,
+        "guid": guid,
         "x": x,
         "y": y
     }
-    
-    # 添加可選參數以區分同名組件
-    if category is not None:
-        params["category"] = category
-    if guid is not None:
-        params["guid"] = guid
-    if library is not None:
-        params["library"] = library
     
     return send_to_grasshopper("add_component", params)
 
@@ -392,6 +328,17 @@ def get_component_info(component_id: str):
     
     return result
 
+@server.tool("get_document_errors")
+def get_document_errors():
+    """
+    Get all error and warning messages from all components in the current Grasshopper document
+    
+    Returns:
+        Dictionary containing errorCount and a list of all errors/warnings with component information
+    """
+    result = send_to_grasshopper("get_document_errors", {})
+    return result
+
 @server.tool("get_all_components")
 def get_all_components():
     """
@@ -498,6 +445,41 @@ def get_component_parameters(component_type: str):
     
     return send_to_grasshopper("get_component_parameters", params)
 
+@server.tool("get_component_candidates")
+def get_component_candidates(name: str):
+    """
+    Get all component candidates that match a given name
+    
+    This tool searches for all components matching the given name and returns
+    detailed information about each candidate, including:
+    - Component name and GUID
+    - Category and subcategory
+    - Library/plugin name
+    - Whether it's obsolete or deprecated
+    - Whether it's a built-in Grasshopper component
+    - Description
+    - Input and output parameters
+    
+    Args:
+        name: Component name to search for (e.g., "Rectangle", "Number Slider")
+    
+    Returns:
+        A dictionary containing:
+        - query: The original search query
+        - normalizedQuery: The normalized component name
+        - count: Number of candidates found
+        - candidates: List of candidate components with detailed information
+    
+    Example:
+        get_component_candidates("Rectangle") will return all Rectangle components
+        with their properties, helping you choose the right one.
+    """
+    params = {
+        "name": name
+    }
+    
+    return send_to_grasshopper("get_component_candidates", params)
+
 @server.tool("validate_connection")
 def validate_connection(source_id: str, target_id: str, source_param: Optional[str] = None, target_param: Optional[str] = None):
     """
@@ -524,6 +506,146 @@ def validate_connection(source_id: str, target_id: str, source_param: Optional[s
         params["targetParam"] = target_param
     
     return send_to_grasshopper("validate_connection", params)
+
+@server.tool("group_components")
+def group_components(component_ids, group_name: Optional[str] = None, color: Optional[str] = None, 
+                     color_r: Optional[int] = None, color_g: Optional[int] = None, color_b: Optional[int] = None):
+    """
+    將多個元件群組起來，可選擇命名和顏色
+    
+    Args:
+        component_ids: 要群組的 componentId 清單，可以是 list 或逗號分隔字串
+        group_name (str, optional): 群組名稱
+        color (str, optional): 十六進制顏色代碼 (例如: "#FF0000" 或 "FF0000")
+        color_r (int, optional): 紅色值 (0-255)
+        color_g (int, optional): 綠色值 (0-255)
+        color_b (int, optional): 藍色值 (0-255)
+    
+    Returns:
+        dict: 回傳群組資訊
+    """
+    # 處理 component_ids：如果是字符串，轉換為列表
+    if isinstance(component_ids, str):
+        ids = [cid.strip() for cid in component_ids.split(",") if cid.strip()]
+    else:
+        ids = [str(cid) for cid in component_ids if str(cid).strip()]
+    
+    params: Dict[str, Any] = {"componentIds": ids}
+    
+    if group_name:
+        params["groupName"] = group_name
+    
+    if color:
+        params["color"] = color
+    elif color_r is not None and color_g is not None and color_b is not None:
+        params["colorR"] = color_r
+        params["colorG"] = color_g
+        params["colorB"] = color_b
+    
+    return send_to_grasshopper("group_components", params)
+
+@server.tool("set_slider_properties")
+def set_slider_properties(component_id: str, value: Optional[str] = None, min_value: Optional[float] = None, 
+                         max_value: Optional[float] = None, rounding: Optional[float] = None):
+    """
+    設定 Number Slider 的完整屬性
+    
+    這是一個專門用於設置 Number Slider 屬性的函數，包括值、範圍和精度
+    
+    Args:
+        component_id (str): Number Slider 組件的 ID
+        value (str, optional): 要設定的值
+        min_value (float, optional): 最小值
+        max_value (float, optional): 最大值
+        rounding (float, optional): 精度（小數點後幾位）
+        
+    Returns:
+        dict: 設定結果
+    """
+    params: Dict[str, Any] = {
+        "id": component_id,
+        "component_type": "Number Slider"
+    }
+    
+    # 添加提供的參數
+    if value is not None:
+        params["value"] = value
+    if min_value is not None:
+        params["min"] = min_value
+    if max_value is not None:
+        params["max"] = max_value
+    if rounding is not None:
+        params["rounding"] = rounding
+    
+    return send_to_grasshopper("set_slider_properties", params)
+
+@server.tool("set_component_visibility")
+def set_component_visibility(component_id: str, hidden: bool):
+    """
+    設置組件可見性
+    
+    控制組件在 Grasshopper 畫布上的顯示/隱藏狀態
+    
+    Args:
+        component_id (str): 組件的 ID
+        hidden (bool): 是否隱藏組件（True = 隱藏, False = 顯示）
+    
+    Returns:
+        dict: 操作結果，包含 success 狀態和消息
+    """
+    params: Dict[str, Any] = {
+        "componentId": component_id,
+        "hidden": hidden
+    }
+    
+    return send_to_grasshopper("set_component_visibility", params)
+
+@server.tool("zoom_to_components")
+def zoom_to_components(component_ids):
+    """
+    縮放到指定的一個或多個組件
+    
+    將 Grasshopper 畫布視圖縮放並聚焦到指定的組件位置。可以接受單個組件 ID 或多個組件 ID 列表。
+    當提供多個組件時，會計算所有組件的合併邊界框並縮放到該區域。
+    
+    Args:
+        component_ids: 組件 ID 列表，可以是：
+            - 單個 ID 字符串
+            - 逗號分隔的 ID 字符串（如 "id1,id2,id3"）
+            - ID 列表（如 ["id1", "id2", "id3"]）
+    
+    Returns:
+        dict: 操作結果，包含：
+            - success: 是否成功
+            - message: 操作消息
+            - componentCount: 成功縮放的組件數量
+            - componentIds: 成功找到的組件 ID 列表
+            - notFoundIds: 未找到的組件 ID 列表（如果有）
+    
+    Example:
+        # 縮放到單個組件
+        zoom_to_components(component_ids="12345678-1234-1234-1234-123456789012")
+        
+        # 縮放到多個組件（逗號分隔）
+        zoom_to_components(component_ids="id1,id2,id3")
+        
+        # 縮放到多個組件（列表）
+        zoom_to_components(component_ids=["id1", "id2", "id3"])
+    """
+    # 處理輸入：如果是字符串，轉換為列表
+    if isinstance(component_ids, str):
+        ids = [cid.strip() for cid in component_ids.split(",") if cid.strip()]
+    else:
+        ids = [str(cid) for cid in component_ids if str(cid).strip()]
+    
+    if not ids:
+        raise ValueError("At least one component ID is required")
+    
+    params: Dict[str, Any] = {
+        "componentIds": ids
+    }
+    
+    return send_to_grasshopper("zoom_to_components", params)
 
 # 註冊 MCP 資源
 @server.resource("grasshopper://status")

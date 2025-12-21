@@ -182,14 +182,24 @@ namespace GH_MCP.Commands
                         return;
                     }
 
-                    // 移除現有連接（如果需要）
-                    if (targetParameter.SourceCount > 0)
+                    // 檢查源參數是否已經連接到目標參數（避免重複連接）
+                    bool alreadyConnected = false;
+                    for (int i = 0; i < targetParameter.SourceCount; i++)
                     {
-                        targetParameter.RemoveAllSources();
+                        if (targetParameter.Sources[i].Equals(sourceParameter))
+                        {
+                            alreadyConnected = true;
+                            RhinoApp.WriteLine($"Connection already exists from {sourceParameter.Name} to {targetParameter.Name}, skipping duplicate");
+                            break;
+                        }
                     }
 
-                    // 連接參數
-                    targetParameter.AddSource(sourceParameter);
+                    // 如果尚未連接，則添加新連接（保留所有現有連接）
+                    if (!alreadyConnected)
+                    {
+                        targetParameter.AddSource(sourceParameter);
+                        RhinoApp.WriteLine($"Added new connection from {sourceParameter.Name} to {targetParameter.Name} (total sources: {targetParameter.SourceCount})");
+                    }
                     
                     // 刷新數據
                     targetParameter.CollectData();
