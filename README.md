@@ -1,6 +1,6 @@
-# Grasshopper MCP Bridge
+# Grasshopper MCP workflow
 
-Grasshopper MCP Bridge is a bridging server that connects Grasshopper and Cursor using the Model Context Protocol (MCP) standard.
+Grasshopper MCP workflow is a bridging server that connects Grasshopper and Cursor using the Model Context Protocol (MCP) standard.
 
 **Language Selection / 語言選擇**: [English](README.md) | [繁體中文](README.zh-TW.md)
 

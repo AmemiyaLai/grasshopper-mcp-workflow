@@ -1,6 +1,6 @@
-# Grasshopper MCP Bridge
+# Grasshopper MCP workflow
 
-Grasshopper MCP Bridge 是一個橋接伺服器，使用模型上下文協議（MCP）標準連接 Grasshopper 和 Cursor。
+Grasshopper MCP workflow 是一個橋接伺服器，使用模型上下文協議（MCP）標準連接 Grasshopper 和 Cursor。
 
 **語言選擇 / Language Selection**: [English](README.md) | [繁體中文](README.zh-TW.md)
 
