@@ -1,12 +1,12 @@
 # Grasshopper MCP Bridge
 
-Grasshopper MCP Bridge 是一個橋接伺服器，使用模型上下文協議（MCP）標準連接 Grasshopper 和 Claude Desktop。
+Grasshopper MCP Bridge 是一個橋接伺服器，使用模型上下文協議（MCP）標準連接 Grasshopper 和 Cursor。
 
 **語言選擇 / Language Selection**: [English](README.md) | [繁體中文](README.zh-TW.md)
 
 ## 功能特色
 
-- **MCP 協議整合**：透過模型上下文協議（MCP）標準連接 Grasshopper 和 Claude Desktop
+- **MCP 協議整合**：透過模型上下文協議（MCP）標準連接 Grasshopper 和 Cursor
 - **組件管理**：提供直觀的工具函數，用於創建、管理和連接 Grasshopper 組件
 - **意圖識別**：支援高階意圖識別，可從簡單描述自動創建複雜的組件模式
 - **組件知識庫**：包含完整的知識庫，了解常見組件的參數和連接規則
@@ -20,10 +20,10 @@ Grasshopper MCP Bridge 是一個橋接伺服器，使用模型上下文協議（
 系統由以下部分組成：
 
 1. **Grasshopper MCP 組件 (GH_MCP.gha)**：安裝在 Grasshopper 中的 C# 插件，提供 TCP 伺服器來接收命令
-2. **Python MCP 橋接伺服器** (`grasshopper_mcp`)：連接 Claude Desktop 和 Grasshopper MCP 組件的橋接伺服器
+2. **Python MCP 橋接伺服器** (`grasshopper_mcp`)：連接 Cursor 和 Grasshopper MCP 組件的橋接伺服器
 3. **Grasshopper Tools** (`grasshopper_tools`)：用於管理 Grasshopper 組件、連接、參數和工作流程的完整 Python 函式庫
 4. **組件知識庫**：包含組件資訊、模式和意圖的 JSON 檔案
-5. **工作流程技能** (`grasshopper-workflow`)：為 Claude Desktop 提供的專業技能，提供進階工作流程自動化功能
+5. **工作流程技能** (`grasshopper-workflow`)：為 Cursor 提供的專業技能，提供進階工作流程自動化功能
 
 ## 安裝說明
 
@@ -32,7 +32,7 @@ Grasshopper MCP Bridge 是一個橋接伺服器，使用模型上下文協議（
 - Rhino 7 或更高版本
 - Grasshopper
 - Python 3.8 或更高版本
-- Claude Desktop
+- Cursor
 
 ### 安裝步驟
 
@@ -74,17 +74,6 @@ Grasshopper MCP Bridge 是一個橋接伺服器，使用模型上下文協議（
    pip install -e .
    ```
 
-   **安裝特定版本**
-   
-   如果您需要安裝特定版本，可以使用：
-   ```
-   pip install grasshopper-mcp==0.1.0
-   ```
-   或從特定的 GitHub 標籤安裝：
-   ```
-   pip install git+https://github.com/alfredatnycu/grasshopper-mcp.git@v0.1.0
-   ```
-
 ## 使用方式
 
 1. **啟動 Rhino 和 Grasshopper**
@@ -104,35 +93,71 @@ Grasshopper MCP Bridge 是一個橋接伺服器，使用模型上下文協議（
    
    > **注意**：由於 Python 腳本路徑問題，`grasshopper-mcp` 命令可能無法直接使用。使用 `python -m grasshopper_mcp.bridge` 是推薦且更可靠的方法。
 
-4. **將 Claude Desktop 連接到 MCP 橋接伺服器**
+4. **配置 Cursor MCP 連接**
 
-   **方法 1：手動連接**
+   在 Cursor 中配置 MCP 伺服器連接，讓 Cursor 能夠與 Grasshopper MCP 橋接伺服器通訊。
    
-   在 Claude Desktop 中，使用以下設定連接到 MCP 橋接伺服器：
-   - 協議：MCP
-   - 主機：localhost
-   - 埠號：8080
+   **配置步驟：**
+   
+   1. 找到 Cursor 的 MCP 配置檔案 `mcp.json`，通常位於：
+      - Windows: `%APPDATA%\Cursor\User\mcp.json` 或 `~\.cursor\mcp.json`
+      - macOS: `~/Library/Application Support/Cursor/User/mcp.json` 或 `~/.cursor/mcp.json`
 
-   **方法 2：配置 Claude Desktop 自動啟動橋接伺服器**
    
-   您可以通過修改配置來設定 Claude Desktop 自動啟動 MCP 橋接伺服器：
+   2. 在 `mcp.json` 檔案中添加以下配置：
    
-   ```json
-   "grasshopper": {
-     "command": "python",
-     "args": ["-m", "grasshopper_mcp.bridge"]
-   }
-   ```
+      ```json
+      {
+        "mcpServers": {
+          "grasshopper": {
+            "command": "python",
+            "args": ["-m", "grasshopper_mcp.bridge"]
+          }
+        }
+      }
+      ```
    
-   此配置告訴 Claude Desktop 使用命令 `python -m grasshopper_mcp.bridge` 來啟動 MCP 伺服器。
+   3. **使用虛擬環境或特定 Python 路徑**：
+      
+      如果您使用虛擬環境或 conda 環境，請指定完整的 Python 可執行檔路徑：
+      
+      ```json
+      {
+        "mcpServers": {
+          "grasshopper": {
+            "command": "C:\\Users\\YourUsername\\.conda\\envs\\grasshopper-mcp\\python.exe",
+            "args": ["-m", "grasshopper_mcp.bridge"]
+          }
+        }
+      }
+      ```
+      
+      > **提示**：在 Windows 上，路徑中的反斜線需要使用雙反斜線 `\\` 或正斜線 `/` 進行轉義。
+   
+   4. **驗證 Python 路徑**：
+      
+      您可以使用以下命令找到 Python 可執行檔的完整路徑：
+      - Windows: `where python` 或 `where python3`
+      - macOS/Linux: `which python` 或 `which python3`
+      
+      如果使用 conda 環境，可以執行：
+      ```
+      conda activate grasshopper-mcp
+      where python  # Windows
+      which python  # macOS/Linux
+      ```
+   
+   5. 儲存配置檔案後，重新啟動 Cursor 以使配置生效。
+   
+   > **注意**：確保在配置 MCP 之前，您已經完成了步驟 2（將 GH_MCP 組件添加到 Grasshopper 畫布）和步驟 3（啟動 Python MCP 橋接伺服器）。MCP 橋接伺服器需要在 Cursor 連接之前運行。
 
-5. **開始使用 Grasshopper 與 Claude Desktop**
+5. **開始使用 Grasshopper 與 Cursor**
 
-   現在您可以使用 Claude Desktop 透過自然語言命令來控制 Grasshopper。
+   現在您可以使用 Cursor 透過自然語言命令來控制 Grasshopper。
 
 ## 範例命令
 
-以下是一些可以在 Claude Desktop 中使用的範例命令：
+以下是一些可以在 Cursor 中使用的範例命令：
 
 - "在點 (0,0,0) 創建一個半徑為 5 的圓"
 - "將圓連接到高度為 10 的擠出組件"
@@ -211,16 +236,17 @@ python -m grasshopper_tools.cli --help
    - 檢查埠號 8080 是否已被其他應用程式使用
    - 驗證 Python 版本是否為 3.8 或更高：`python --version`
 
-3. **Claude Desktop 無法連接**
+3. **Cursor 無法連接**
    - 確保橋接伺服器正在運行
    - 驗證您使用的是正確的連接設定（localhost:8080）
    - 檢查橋接伺服器的控制台輸出是否有錯誤訊息
    - 確保 GH_MCP 組件已添加到您的 Grasshopper 畫布上
+   - 檢查 Cursor 的 MCP 配置是否正確
 
 4. **命令無法執行**
    - 驗證 GH_MCP 組件是否在您的 Grasshopper 畫布上
    - 檢查橋接伺服器控制台是否有錯誤訊息
-   - 確保 Claude Desktop 正確連接到橋接伺服器
+   - 確保 Cursor 正確連接到橋接伺服器
    - 使用 `grasshopper_tools` 時驗證組件 GUID 是否正確
 
 5. **Grasshopper Tools 問題**
@@ -254,7 +280,7 @@ grasshopper-mcp/
 │       ├── Models/            # 資料模型
 │       ├── Utils/             # 工具函數
 │       └── Resources/         # 組件知識庫
-├── grasshopper-workflow/      # Claude 工作流程技能
+├── grasshopper-workflow/      # Cursor 工作流程技能
 │   ├── references/           # API 參考
 │   ├── scripts/              # 工作流程腳本
 │   └── SKILL.md              # 技能文檔
@@ -276,7 +302,7 @@ grasshopper-mcp/
 ### 其他資源
 
 - **Grasshopper Tools 文檔**：請參閱 [grasshopper_tools/docs/](grasshopper_tools/docs/) 以獲取詳細的 API 文檔和使用指南
-- **工作流程技能**：`grasshopper-workflow` 技能為 Claude Desktop 提供進階工作流程自動化功能
+- **工作流程技能**：`grasshopper-workflow` 技能為 Cursor 提供進階工作流程自動化功能
 - **範例腳本**：查看 `scripts/` 目錄以獲取使用範例腳本
 - **提示範本**：`prompt/` 目錄包含各種工作流程步驟的提示範本
 
@@ -290,6 +316,21 @@ grasshopper-mcp/
 - 盡可能包含測試
 - 如果添加新功能或更改安裝步驟，請更新此 README
 
+## 版本紀錄
+
+### 版本 0.1.0
+
+**發布日期**: 2024-12-19
+
+- Grasshopper MCP Bridge 首次發布
+- 支援與 Cursor 的 MCP 協議整合
+- 組件管理和連接工具
+- 意圖識別功能，可自動創建組件模式
+- 完整的組件知識庫
+- 從 JSON 和 MMD 檔案執行工作流程自動化
+- 用於批次操作的 CLI 工具
+- 參數和群組管理功能
+
 ## 授權
 
 本專案採用 MIT 授權條款 - 詳見 LICENSE 檔案。
@@ -297,7 +338,7 @@ grasshopper-mcp/
 ## 致謝
 
 - 感謝 Rhino 和 Grasshopper 社群提供優秀的工具
-- 感謝 Anthropic 提供 Claude Desktop 和 MCP 協議
+- 感謝 Cursor 和 MCP 協議的支援
 
 ## 聯絡方式
 

@@ -1,12 +1,12 @@
 # Grasshopper MCP Bridge
 
-Grasshopper MCP Bridge is a bridging server that connects Grasshopper and Claude Desktop using the Model Context Protocol (MCP) standard.
+Grasshopper MCP Bridge is a bridging server that connects Grasshopper and Cursor using the Model Context Protocol (MCP) standard.
 
 **Language Selection / 語言選擇**: [English](README.md) | [繁體中文](README.zh-TW.md)
 
 ## Features
 
-- **MCP Protocol Integration**: Connects Grasshopper and Claude Desktop through the Model Context Protocol (MCP) standard
+- **MCP Protocol Integration**: Connects Grasshopper and Cursor through the Model Context Protocol (MCP) standard
 - **Component Management**: Intuitive tool functions for creating, managing, and connecting Grasshopper components
 - **Intent Recognition**: Supports high-level intent recognition, automatically creating complex component patterns from simple descriptions
 - **Component Knowledge Base**: Includes a comprehensive knowledge base that understands parameters and connection rules for common components
@@ -20,10 +20,10 @@ Grasshopper MCP Bridge is a bridging server that connects Grasshopper and Claude
 The system consists of the following parts:
 
 1. **Grasshopper MCP Component (GH_MCP.gha)**: A C# plugin installed in Grasshopper that provides a TCP server to receive commands
-2. **Python MCP Bridge Server** (`grasshopper_mcp`): A bridge server that connects Claude Desktop and the Grasshopper MCP component
+2. **Python MCP Bridge Server** (`grasshopper_mcp`): A bridge server that connects Cursor and the Grasshopper MCP component
 3. **Grasshopper Tools** (`grasshopper_tools`): A comprehensive Python library for managing Grasshopper components, connections, parameters, and workflows
 4. **Component Knowledge Base**: JSON files containing component information, patterns, and intents
-5. **Workflow Skill** (`grasshopper-workflow`): A specialized skill for Claude Desktop that provides advanced workflow automation capabilities
+5. **Workflow Skill** (`grasshopper-workflow`): A specialized skill for Cursor that provides advanced workflow automation capabilities
 
 ## Installation Instructions
 
@@ -32,7 +32,7 @@ The system consists of the following parts:
 - Rhino 7 or higher
 - Grasshopper
 - Python 3.8 or higher
-- Claude Desktop
+- Cursor
 
 ### Installation Steps
 
@@ -74,17 +74,6 @@ The system consists of the following parts:
    pip install -e .
    ```
 
-   **Install a Specific Version**
-   
-   If you need to install a specific version, you can use:
-   ```
-   pip install grasshopper-mcp==0.1.0
-   ```
-   Or install from a specific GitHub tag:
-   ```
-   pip install git+https://github.com/alfredatnycu/grasshopper-mcp.git@v0.1.0
-   ```
-
 ## Usage
 
 1. **Start Rhino and Grasshopper**
@@ -104,35 +93,70 @@ The system consists of the following parts:
    
    > **Note**: The command `grasshopper-mcp` might not work directly due to Python script path issues. Using `python -m grasshopper_mcp.bridge` is the recommended and more reliable method.
 
-4. **Connect Claude Desktop to the MCP Bridge**
+4. **Configure Cursor MCP Connection**
 
-   **Method 1: Manual Connection**
+   Configure the MCP server connection in Cursor to enable communication between Cursor and the Grasshopper MCP bridge server.
    
-   In Claude Desktop, connect to the MCP Bridge server using the following settings:
-   - Protocol: MCP
-   - Host: localhost
-   - Port: 8080
+   **Configuration Steps:**
+   
+   1. Locate Cursor's MCP configuration file `mcp.json`, typically located at:
+      - Windows: `%APPDATA%\Cursor\User\mcp.json` or `~\.cursor\mcp.json`
+      - macOS: `~/Library/Application Support/Cursor/User/mcp.json` or `~/.cursor/mcp.json`
+   
+   2. Add the following configuration to the `mcp.json` file:
+   
+      ```json
+      {
+        "mcpServers": {
+          "grasshopper": {
+            "command": "python",
+            "args": ["-m", "grasshopper_mcp.bridge"]
+          }
+        }
+      }
+      ```
+   
+   3. **Using Virtual Environment or Specific Python Path**:
+      
+      If you're using a virtual environment or conda environment, specify the full path to the Python executable:
+      
+      ```json
+      {
+        "mcpServers": {
+          "grasshopper": {
+            "command": "C:\\Users\\YourUsername\\.conda\\envs\\grasshopper-mcp\\python.exe",
+            "args": ["-m", "grasshopper_mcp.bridge"]
+          }
+        }
+      }
+      ```
+      
+      > **Tip**: On Windows, backslashes in paths need to be escaped with double backslashes `\\` or use forward slashes `/`.
+   
+   4. **Verify Python Path**:
+      
+      You can find the full path to your Python executable using:
+      - Windows: `where python` or `where python3`
+      - macOS/Linux: `which python` or `which python3`
+      
+      If using a conda environment, you can run:
+      ```
+      conda activate grasshopper-mcp
+      where python  # Windows
+      which python  # macOS/Linux
+      ```
+   
+   5. After saving the configuration file, restart Cursor for the changes to take effect.
+   
+   > **Note**: Make sure you have completed steps 2 (adding the GH_MCP component to the Grasshopper canvas) and step 3 (starting the Python MCP bridge server) before configuring MCP. The MCP bridge server needs to be running before Cursor can connect.
 
-   **Method 2: Configure Claude Desktop to Auto-Start the Bridge**
-   
-   You can configure Claude Desktop to automatically start the MCP Bridge server by modifying its configuration:
-   
-   ```json
-   "grasshopper": {
-     "command": "python",
-     "args": ["-m", "grasshopper_mcp.bridge"]
-   }
-   ```
-   
-   This configuration tells Claude Desktop to use the command `python -m grasshopper_mcp.bridge` to start the MCP server.
+5. **Start Using Grasshopper with Cursor**
 
-5. **Start Using Grasshopper with Claude Desktop**
-
-   You can now use Claude Desktop to control Grasshopper through natural language commands.
+   You can now use Cursor to control Grasshopper through natural language commands.
 
 ## Example Commands
 
-Here are some example commands you can use with Claude Desktop:
+Here are some example commands you can use with Cursor:
 
 - "Create a circle with radius 5 at point (0,0,0)"
 - "Connect the circle to an extrude component with a height of 10"
@@ -211,16 +235,17 @@ If you encounter issues, check the following:
    - Check if port 8080 is already in use by another application
    - Verify Python version is 3.8 or higher: `python --version`
 
-3. **Claude Desktop Can't Connect**
+3. **Cursor Can't Connect**
    - Ensure the bridge server is running
    - Verify you're using the correct connection settings (localhost:8080)
    - Check the console output of the bridge server for any error messages
    - Ensure the GH_MCP component is added to your Grasshopper canvas
+   - Check that Cursor's MCP configuration is correct
 
 4. **Commands Not Executing**
    - Verify the GH_MCP component is on your Grasshopper canvas
    - Check the bridge server console for error messages
-   - Ensure Claude Desktop is properly connected to the bridge server
+   - Ensure Cursor is properly connected to the bridge server
    - Verify the component GUIDs are correct when using `grasshopper_tools`
 
 5. **Grasshopper Tools Issues**
@@ -254,7 +279,7 @@ grasshopper-mcp/
 │       ├── Models/            # Data models
 │       ├── Utils/             # Utilities
 │       └── Resources/         # Component knowledge base
-├── grasshopper-workflow/      # Workflow skill for Claude
+├── grasshopper-workflow/      # Workflow skill for Cursor
 │   ├── references/           # API references
 │   ├── scripts/              # Workflow scripts
 │   └── SKILL.md              # Skill documentation
@@ -275,7 +300,7 @@ grasshopper-mcp/
 ### Additional Resources
 
 - **Grasshopper Tools Documentation**: See [grasshopper_tools/docs/](grasshopper_tools/docs/) for detailed API documentation and usage guides
-- **Workflow Skill**: The `grasshopper-workflow` skill provides advanced workflow automation capabilities for Claude Desktop
+- **Workflow Skill**: The `grasshopper-workflow` skill provides advanced workflow automation capabilities for Cursor
 - **Example Scripts**: Check the `scripts/` directory for example usage scripts
 - **Prompt Templates**: The `prompt/` directory contains prompt templates for various workflow steps
 
@@ -289,6 +314,21 @@ When contributing:
 - Include tests when possible
 - Update this README if adding new features or changing installation steps
 
+## Changelog
+
+### Version 0.1.0
+
+**Release Date**: 2024-12-19
+
+- Initial release of Grasshopper MCP Bridge
+- Support for MCP protocol integration with Cursor
+- Component management and connection tools
+- Intent recognition for automatic component pattern creation
+- Comprehensive component knowledge base
+- Workflow automation from JSON and MMD files
+- CLI tools for batch operations
+- Parameter and group management capabilities
+
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
@@ -296,7 +336,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Acknowledgments
 
 - Thanks to the Rhino and Grasshopper community for their excellent tools
-- Thanks to Anthropic for Claude Desktop and the MCP protocol
+- Thanks to Cursor and the MCP protocol support
 
 ## Contact
 
