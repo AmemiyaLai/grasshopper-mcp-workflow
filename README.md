@@ -2,6 +2,8 @@
 
 Grasshopper MCP workflow is a bridging server that connects Grasshopper and Cursor using the Model Context Protocol (MCP) standard.
 
+document:[https://www.autodesignlab.org/zh/blog/lecture-2025-rhino-mcp/](https://www.autodesignlab.org/en/blog/lecture-2025-rhino-mcp-p2/)
+
 **Language Selection / 語言選擇**: [English](README.md) | [繁體中文](README.zh-TW.md)
 
 ## Features
