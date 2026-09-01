@@ -1,0 +1,10 @@
+﻿apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: grasshopper-mcp-workflow
+  title: grasshopper-mcp-workflow
+  description: Software catalog component for grasshopper-mcp-workflow
+spec:
+  type: service
+  lifecycle: experimental
+  owner: AmemiyaLai

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 組織治理規範與討論
+    url: https://github.com/autodesignlab/org-governance
+    about: 若問題與組織架構或治理規範相關, 請至 org-governance repo 提出討論.
+  - name: 範例庫與撰寫手冊
+    url: https://github.com/autodesignlab/org-governance/blob/main/docs/examples/issue-and-pr-examples.md
+    about: 檢視標準 Issue 與 PR 填寫範例與指南.

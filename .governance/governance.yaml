@@ -1,0 +1,28 @@
+schemaVersion: "2.0"
+
+repository:
+  id: "grasshopper-mcp-workflow"
+  type: app
+
+governance:
+  level: G1
+  target: G4
+  riskTier: T2
+
+branching:
+  profile: production
+  ciProfile: application
+  branches:
+    stable: main
+    development: dev
+    integration: { enabled: false, pattern: "integration/<version>" }
+    release: { enabled: true, pattern: "release/<version>" }
+    task: { issueRequired: true, patterns: ["<type>/<issue>-<description>"] }
+    hotfix: { pattern: "hotfix/<version>-<description>" }
+
+commit:
+  scopeProfiles:
+    - application
+  scopes: []
+
+extends: []

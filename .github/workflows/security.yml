@@ -1,0 +1,14 @@
+﻿name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  secret-scan:
+    uses: autodesignlab/org-workflows/.github/workflows/secret-scan.yml@main
+
+  code-scan:
+    uses: autodesignlab/org-workflows/.github/workflows/code-scan.yml@main

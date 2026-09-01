@@ -61,3 +61,17 @@ $RECYCLE.BIN/
 # Project specific
 Grasshopper Tutorial for Beginners.pdf
 grasshopper_mcp_bridge.py
+
+
+# Security Baseline
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*firebase-adminsdk*.json
+.next
+.astro
+.pnpm-home
+.gradle
+node_modules

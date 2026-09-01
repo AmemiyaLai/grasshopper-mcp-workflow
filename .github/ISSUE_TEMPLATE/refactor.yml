@@ -1,0 +1,116 @@
+name: Refactor / Tech Debt
+description: 提案架構重構, 程式碼清理或技術債償還 (不改變外部行為)
+title: "[Refactor]: "
+type: Refactor
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 現有架構痛點與技術債描述
+      description: 目前代碼或架構存在什麼問題 (如 Middle Man, 過度耦合, 效能瓶頸等)?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 重構目標與設計方案
+      description: 預計如何重構, 是否有特定的設計模式或解耦策略?
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: 行為不變性與驗證策略
+      description: 如何確保重構過程未破壞既有外部合約與業務邏輯?
+      placeholder: |
+        - [ ] 單元測試全數覆蓋
+        - [ ] 介面向後相容性檢驗
+    validations:
+      required: true
+
+  # ── AI Context Contract (AI-STD-EXEC-001 Section 3.1) ──────────────
+  # Acceptance Criteria / Out of Scope / Expected Tests 為強制欄位:
+  # 缺其一, Agent 即開始猜測, 而猜測正是 AI 產出無法驗證的主要來源。
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        ### AI 執行契約 (AI Context Contract)
+
+        下列欄位使本 Issue 成為 AI Agent 可無猜測執行的契約。
+        詳見 [AI-STD-EXEC-001](https://github.com/autodesignlab/org-governance/blob/main/standards/ai/agent-execution-standard.md)。
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria (驗收條件)
+      description: 具體可驗證的驗收場景; 建議採用條列或 Given-When-Then 格式.
+      placeholder: |
+        - [ ] Given ..., When ..., Then ...
+        - [ ] ...
+    validations:
+      required: true
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of Scope (明確排除項)
+      description: 本次**明確不做**的項目; 用於防止範圍蔓延 (Scope Creep).
+      placeholder: |
+        - 不調整 ... 的資料結構
+        - 不處理 ... 的向後相容
+    validations:
+      required: true
+  - type: textarea
+    id: expected_tests
+    attributes:
+      label: Expected Tests (預期測試)
+      description: 預期新增或必須通過的測試; 這是 PR 的 Evidence 區塊的比對基準.
+      placeholder: |
+        - 新增 tests/test_xxx.py 覆蓋 ...
+        - 既有測試套件全數通過
+    validations:
+      required: true
+  - type: textarea
+    id: relevant_modules
+    attributes:
+      label: Relevant Modules (受影響模組)
+      description: 受影響的模組與對應的 Conventional Commit Scope.
+      placeholder: |
+        - src/geometry/ (scope: geometry)
+    validations:
+      required: false
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints (技術限制)
+      description: 不可變更的介面、相依版本或效能限制.
+    validations:
+      required: false
+  - type: textarea
+    id: security_migration
+    attributes:
+      label: Security Considerations / Migration Impact
+      description: 資安影響, 以及資料或設定的遷移影響. 無則填「無」.
+    validations:
+      required: false
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: 相關文件、既有實作或上游 Issue.
+    validations:
+      required: false
+  - type: dropdown
+    id: spec_readiness
+    attributes:
+      label: Spec Readiness (規格成熟度)
+      description: >-
+        宣告本 Issue 作為執行契約的成熟度。僅 ready-for-ai 可被 AI Dispatcher 領取,
+        且 MUST 同時滿足 Workflow State = Ready.
+      options:
+        - draft
+        - needs-context
+        - ready-for-ai
+        - needs-human
+      default: 0
+    validations:
+      required: true

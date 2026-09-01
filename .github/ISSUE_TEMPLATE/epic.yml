@@ -1,0 +1,36 @@
+name: Epic
+description: 跨模組, 大型架構演進或多階段里程碑主題 (不直接建立程式碼分支)
+title: "[Epic]: "
+type: Epic
+body:
+  - type: textarea
+    id: vision
+    attributes:
+      label: 史詩願景與核心目標 (Epic Vision)
+      description: 說明此 Epic 欲達成的整體架構變革或大型業務目標.
+    validations:
+      required: true
+  - type: textarea
+    id: architecture
+    attributes:
+      label: 系統架構與流程設計
+      description: 包含架構圖, 跨服務相依性或資料流向.
+    validations:
+      required: false
+  - type: textarea
+    id: breakdown
+    attributes:
+      label: 子任務分解清單 (Task Breakdown)
+      description: 列出關聯之 Sub-issues (Feature / Refactor / Infra / Task).
+      placeholder: |
+        - [ ] #000 - [Feature]: ...
+        - [ ] #000 - [Infrastructure]: ...
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        > **Epic 不可派工**: Epic 僅用於工作分解與彙整, MUST NOT 直接建立程式碼分支,
+        > 亦 MUST NOT 被指派給 AI Agent。實際執行由其 Sub-issue 承擔。
+        > 見 [AI-STD-EXEC-001 Section 2.1](https://github.com/autodesignlab/org-governance/blob/main/standards/ai/agent-execution-standard.md)。

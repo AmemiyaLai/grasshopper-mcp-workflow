@@ -1,0 +1,11 @@
+name: Governance
+
+on:
+  pull_request:
+
+jobs:
+  governance:
+    uses: autodesignlab/org-workflows/.github/workflows/governance-check.yml@main
+    with:
+      mode: observe
+    secrets: inherit

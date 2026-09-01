@@ -1,0 +1,144 @@
+name: Bug Report
+description: 回報現有功能行為與預期不符之缺陷
+title: "[Bug]: "
+type: Bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感謝回報問題! 請盡可能提供完整重現步驟與環境資訊以加速除錯流程.
+  - type: textarea
+    id: description
+    attributes:
+      label: 問題描述
+      description: 發生了什麼異常現象?
+      placeholder: 請簡要描述遇到的問題...
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 重現步驟 (Reproduction Steps)
+      description: 請條列清晰的重現步驟 (最小可重現場景)
+      placeholder: |
+        1. 進入 '...'
+        2. 點擊 '....'
+        3. 觀察到錯誤 '....'
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 預期行為 vs 實際行為
+      description: 原本預期系統應該如何運作, 實際發生了什麼?
+      placeholder: |
+        預期行為:
+        實際行為:
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 環境資訊
+      description: 相關的作業系統, 瀏覽器, Commit SHA 或硬體環境
+      placeholder: |
+        - OS: Windows 11 / Linux
+        - Browser / Node / Python Version:
+        - Commit SHA / Release Tag:
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: 錯誤日誌或 Stack Trace (選填)
+      description: 請貼上終端機或瀏覽器主控台 (Console) 的錯誤訊息
+      render: shell
+    validations:
+      required: false
+
+  # ── AI Context Contract (AI-STD-EXEC-001 Section 3.1) ──────────────
+  # Acceptance Criteria / Out of Scope / Expected Tests 為強制欄位:
+  # 缺其一, Agent 即開始猜測, 而猜測正是 AI 產出無法驗證的主要來源。
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        ### AI 執行契約 (AI Context Contract)
+
+        下列欄位使本 Issue 成為 AI Agent 可無猜測執行的契約。
+        詳見 [AI-STD-EXEC-001](https://github.com/autodesignlab/org-governance/blob/main/standards/ai/agent-execution-standard.md)。
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria (驗收條件)
+      description: 具體可驗證的驗收場景; 建議採用條列或 Given-When-Then 格式.
+      placeholder: |
+        - [ ] Given ..., When ..., Then ...
+        - [ ] ...
+    validations:
+      required: true
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of Scope (明確排除項)
+      description: 本次**明確不做**的項目; 用於防止範圍蔓延 (Scope Creep).
+      placeholder: |
+        - 不調整 ... 的資料結構
+        - 不處理 ... 的向後相容
+    validations:
+      required: true
+  - type: textarea
+    id: expected_tests
+    attributes:
+      label: Expected Tests (預期測試)
+      description: 預期新增或必須通過的測試; 這是 PR 的 Evidence 區塊的比對基準.
+      placeholder: |
+        - 新增 tests/test_xxx.py 覆蓋 ...
+        - 既有測試套件全數通過
+    validations:
+      required: true
+  - type: textarea
+    id: relevant_modules
+    attributes:
+      label: Relevant Modules (受影響模組)
+      description: 受影響的模組與對應的 Conventional Commit Scope.
+      placeholder: |
+        - src/geometry/ (scope: geometry)
+    validations:
+      required: false
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints (技術限制)
+      description: 不可變更的介面、相依版本或效能限制.
+    validations:
+      required: false
+  - type: textarea
+    id: security_migration
+    attributes:
+      label: Security Considerations / Migration Impact
+      description: 資安影響, 以及資料或設定的遷移影響. 無則填「無」.
+    validations:
+      required: false
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: 相關文件、既有實作或上游 Issue.
+    validations:
+      required: false
+  - type: dropdown
+    id: spec_readiness
+    attributes:
+      label: Spec Readiness (規格成熟度)
+      description: >-
+        宣告本 Issue 作為執行契約的成熟度。僅 ready-for-ai 可被 AI Dispatcher 領取,
+        且 MUST 同時滿足 Workflow State = Ready.
+      options:
+        - draft
+        - needs-context
+        - ready-for-ai
+        - needs-human
+      default: 0
+    validations:
+      required: true
