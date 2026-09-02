@@ -1,11 +1,11 @@
-schemaVersion: "2.0"
+﻿schemaVersion: "2.0"
 
 repository:
   id: "grasshopper-mcp-workflow"
   type: app
 
 governance:
-  level: G1
+  level: G2
   target: G4
   riskTier: T2
 
@@ -23,6 +23,45 @@ branching:
 commit:
   scopeProfiles:
     - application
-  scopes: []
+  scopes:
+    - mcp
+    - grasshopper
+    - rhino
+    - protocol
+    - tools
+    - runner
+    - schema
+    - workflow
 
 extends: []
+
+policies:
+  coverage:
+    enabled: true
+    thresholds:
+      statements: 75
+      branches: 75
+      functions: 75
+      lines: 75
+  dependency:
+    enforceLockfile: true
+    blockVulnerabilities:
+      - high
+      - critical
+  license:
+    policy: "commercial-permissive"
+    allowed:
+      - "MIT"
+      - "Apache-2.0"
+      - "BSD-2-Clause"
+      - "BSD-3-Clause"
+      - "ISC"
+      - "CC0-1.0"
+      - "Unlicense"
+    blocked:
+      - "GPL-2.0"
+      - "GPL-3.0"
+      - "AGPL-3.0"
+      - "SSPL"
+
+

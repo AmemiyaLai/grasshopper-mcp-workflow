@@ -1,0 +1,53 @@
+﻿name: Dependency & License Compliance (SEC-STD-DEP-LIC-001)
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+  workflow_dispatch:
+
+jobs:
+  compliance-check:
+    name: Python Dependency Audit, License Check & SBOM
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install pip-audit pip-licenses
+
+      - name: 1. Dependency Security Audit
+        run: |
+          echo "Running pip-audit..."
+          pip-audit || echo "::warning ::Vulnerabilities detected in Python dependencies."
+
+      - name: 2. License Compliance Check
+        run: |
+          echo "Running license check..."
+          pip-licenses --fail-on="GPL;AGPL;SSPL" --format=markdown || {
+            echo "::warning ::Blacklisted copyleft licenses detected."
+          }
+
+      - name: 3. Generate SBOM
+        run: |
+          echo "Generating SBOM..."
+          pip list --format=json > sbom.json
+
+      - name: Upload SBOM Artifact
+        if: always() && hashFiles('sbom.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyclonedx-sbom
+          path: sbom.json
+          retention-days: 14

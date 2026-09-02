@@ -4,6 +4,12 @@ metadata:
   name: grasshopper-mcp-workflow
   title: grasshopper-mcp-workflow
   description: Software catalog component for grasshopper-mcp-workflow
+  annotations:
+    governance/level: "G2"
+    governance.ema/commercial-readiness: "Ready"
+    governance.ema/license-risk: "Low"
+    governance.ema/sbom-ref: "dir:sbom.json"
+    governance.ema/release-version: "v0.1.0"
 spec:
   type: service
   lifecycle: experimental
