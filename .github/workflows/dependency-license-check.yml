@@ -1,4 +1,4 @@
-﻿name: Dependency & License Compliance (SEC-STD-DEP-LIC-001)
+name: Dependency & License Compliance (SEC-STD-DEP-LIC-001)
 
 on:
   push:
@@ -46,7 +46,7 @@ jobs:
 
       - name: Upload SBOM Artifact
         if: always() && hashFiles('sbom.json') != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cyclonedx-sbom
           path: sbom.json
