@@ -77,3 +77,8 @@ grasshopper_mcp_bridge.py
 .pnpm-home
 .gradle
 node_modules
+
+# [sync-all-repos] 自動補上：掃描／測試產物
+coverage/
+*.sarif
+test-results/

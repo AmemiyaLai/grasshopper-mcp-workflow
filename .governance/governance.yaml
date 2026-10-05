@@ -64,4 +64,15 @@ policies:
       - "AGPL-3.0"
       - "SSPL"
 
+quality:
+  enabled: true
+  thresholds:
+    minCoverage: 35
+    minPassRate: 100
+  audit:
+    lastAuditedCommit: "c11719e"
+    recordedCoverage: 95
+    testPassRate: 100
+    auditedAt: '2026-09-24T20:57:10Z'
+
 
